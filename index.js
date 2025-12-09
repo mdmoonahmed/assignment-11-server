@@ -27,12 +27,50 @@ async function run() {
     const db = client.db("chef-hut");
     const userCollection = db.collection("users");
     const mealsCollection = db.collection("meals");
+    const reviewCollection = db.collection("reviews");
     //    upload user in db
     app.post("/users", async (req, res) => {
       const users = req.body;
       const result = await userCollection.insertOne(users);
       res.send(result);
     });
+    /****************reviews database*************************/ 
+
+    // POST /reviews
+app.post("/reviews", async (req, res) => {
+  try {
+    const { foodId, reviewerName, reviewerImage, rating, comment } = req.body;
+
+    // basic validation
+    if (!foodId || !reviewerName || typeof rating === "undefined" || !comment) {
+      return res.status(400).json({ error: "foodId, reviewerName, rating and comment are required." });
+    }
+
+    const parsedRating = Number(rating);
+    if (Number.isNaN(parsedRating) || parsedRating < 0 || parsedRating > 5) {
+      return res.status(400).json({ error: "rating must be a number between 0 and 5." });
+    }
+
+    const doc = {
+      foodId: String(foodId),
+      reviewerName: String(reviewerName),
+      reviewerImage: reviewerImage ? String(reviewerImage) : "",
+      rating: parsedRating,
+      comment: String(comment),
+      date: new Date().toISOString(), 
+    };
+
+    const result = await reviewCollection.insertOne(doc);
+    return res.status(201).json({ insertedId: result.insertedId, review: doc });
+  } catch (err) {
+    console.error("POST /reviews error:", err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+
+
+    /****************meals database*************************/ 
 
     // get featured meals from db
     app.get("/featured-meals", async (req, res) => {
@@ -54,7 +92,6 @@ async function run() {
     // meals details
     app.get("/meals/:id",async (req, res) => {
        const {id} = req.params;
-       console.log(id);
        const objectId = new ObjectId(id);
 
        const result = await mealsCollection.findOne({_id: objectId});
