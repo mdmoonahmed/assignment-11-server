@@ -1,7 +1,7 @@
 const express = require("express");
 const cors = require("cors");
 require("dotenv").config();
-const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
+const { MongoClient, ServerApiVersion, ObjectId, ChangeStream } = require("mongodb");
 const app = express();
 const port = 3000;
 
@@ -28,12 +28,66 @@ async function run() {
     const userCollection = db.collection("users");
     const mealsCollection = db.collection("meals");
     const reviewCollection = db.collection("reviews");
+    const favoriteCollection = db.collection("favorites")
     //    upload user in db
     app.post("/users", async (req, res) => {
       const users = req.body;
       const result = await userCollection.insertOne(users);
       res.send(result);
     });
+
+  /******************Favorites Database**********************/  
+  //  Post / favorites
+ // POST /favorites
+app.post("/favorites", async (req, res) => {
+  try {
+    const { userEmail, mealId, mealName, chefId, chefName, price } = req.body;
+
+    if (!userEmail || !mealId || !chefId) {
+      return res.status(400).json({
+        error: "userEmail, mealId and chefId are required.",
+      });
+    }
+
+    // prevent duplicate favorite
+    const exists = await favoriteCollection.findOne({
+      userEmail: String(userEmail),
+      mealId: String(mealId),
+    });
+
+    if (exists) {
+      return res.status(409).json({
+        error: "Meal already added to favorites.",
+      });
+    }
+
+    const doc = {
+      userEmail: String(userEmail),
+      mealId: String(mealId),
+      mealName: String(mealName || ""),
+      chefId: String(chefId),
+      chefName: String(chefName || ""),
+      price: Number(price || 0),
+      addedTime: new Date().toISOString(),
+    };
+
+    const result = await favoriteCollection.insertOne(doc);
+    await favoriteCollection.createIndex(
+   { userEmail: 1, mealId: 1 },
+   { unique: true }
+   );
+
+
+    return res.status(201).json({
+      insertedId: result.insertedId,
+      favorite: doc,
+    });
+  } catch (err) {
+    console.error("POST /favorites error:", err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
     /****************reviews database*************************/ 
 
     // POST /reviews
@@ -67,6 +121,49 @@ app.post("/reviews", async (req, res) => {
     return res.status(500).json({ error: "Internal server error" });
   }
 });
+
+  // GET /reviews?foodId
+app.get("/reviews", async (req, res) => {
+  try {
+    const foodId = req.query.foodId;
+    if (!foodId) {
+      return res.status(400).json({ error: "foodId query parameter is required." });
+    }
+
+    const page = Math.max(1, parseInt(req.query.page || "1", 10));
+    const limit = Math.min(100, parseInt(req.query.limit || "20", 10));
+    const skip = (page - 1) * limit;
+
+    const query = { foodId: String(foodId) };
+
+    const projection = {
+      foodId: 1,
+      reviewerName: 1,
+      reviewerImage: 1,
+      rating: 1,
+      comment: 1,
+      date: 1,
+    };
+
+    const cursor = reviewCollection
+      .find(query)
+      .project(projection)
+      .sort({ date: -1 }) 
+      .skip(skip)
+      .limit(limit);
+
+    const reviews = await cursor.toArray();
+    const total = await reviewCollection.countDocuments(query);
+
+    return res.json({ reviews, total, page, limit });
+  } catch (err) {
+    console.error("GET /reviews error:", err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+
+
 
 
 
