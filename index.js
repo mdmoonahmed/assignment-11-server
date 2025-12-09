@@ -1,7 +1,7 @@
 const express = require("express");
 const cors = require("cors");
 require("dotenv").config();
-const { MongoClient, ServerApiVersion } = require("mongodb");
+const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const app = express();
 const port = 3000;
 
@@ -36,9 +36,31 @@ async function run() {
 
     // get featured meals from db
     app.get("/featured-meals", async (req, res) => {
-      const meals = await mealsCollection.find().limit(6).toArray();
+      const meals = await mealsCollection.find()
+      .limit(6)
+      .project({
+            foodName: 1,
+            foodImage: 1,
+            price: 1,
+            rating: 1,
+            chefName: 1,
+            chefId: 1,
+            deliveryArea: 1,
+            createdAt: 1,
+          })
+      .toArray();
       res.send(meals);
     });
+    // meals details
+    app.get("/meals/:id",async (req, res) => {
+       const {id} = req.params;
+       console.log(id);
+       const objectId = new ObjectId(id);
+
+       const result = await mealsCollection.findOne({_id: objectId});
+       res.send(result)
+       
+    })
 
     // all meals from db
     app.get("/meals", async (req, res) => {
@@ -86,7 +108,7 @@ async function run() {
       }
     });
 
-    
+
   } finally {
     // Ensures that the client will close when you finish/error
     // await client.close();
