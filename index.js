@@ -121,6 +121,26 @@ app.post("/reviews", async (req, res) => {
     return res.status(500).json({ error: "Internal server error" });
   }
 });
+  
+  // GET /reviews/home
+app.get("/reviews/home", async (req, res) => {
+  try {
+    const {limit} = req.query;
+    // const limit = Math.min(50, Math.max(1, parseInt(raw ?? "6", 10)));
+
+    const reviews = await reviewCollection
+      .find({})
+      .sort({ date: -1 })
+      .limit(Number(limit))
+      .toArray();
+
+    return res.json(reviews);
+  } catch (err) {
+    console.error("GET /reviews/home error:", err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 
   // GET /reviews?foodId
 app.get("/reviews", async (req, res) => {
