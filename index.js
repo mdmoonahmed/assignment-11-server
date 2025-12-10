@@ -31,16 +31,24 @@ async function run() {
     const reviewCollection = db.collection("reviews");
     const favoriteCollection = db.collection("favorites");
     const orderCollection = db.collection("orders");
-    
-    /***********User Database***************/
-    // Get/ user/role
-    app.get("/users/:email/role",async(req,res) => {
-       const {email} = req.params;
-       const query = {email};
-       const user = await userCollection.findOne(query);
 
-       res.send({role : user?.role || 'user'})
-    })
+    /***********User Database***************/
+        // GET /users/:email/role
+    app.get("/users/:email/role", async (req, res) => {
+      try {
+        const email = req.params.email;           
+        if (!email) return res.status(400).json({ error: "email required" });
+    
+        const query = { email: String(email) };
+        const user = await userCollection.findOne(query); 
+    
+        return res.json({ role: user?.role || "user" });
+      } catch (err) {
+        console.error("GET /users/:email/role error:", err);
+        return res.status(500).json({ error: "Internal server error" });
+      }
+    });
+
 
     //    Post/ user 
     app.post("/users", async (req, res) => {
