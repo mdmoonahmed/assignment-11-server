@@ -2,6 +2,7 @@ const express = require("express");
 const cors = require("cors");
 require("dotenv").config();
 const { MongoClient, ServerApiVersion, ObjectId, ChangeStream } = require("mongodb");
+
 const app = express();
 const port = 3000;
 
@@ -28,7 +29,8 @@ async function run() {
     const userCollection = db.collection("users");
     const mealsCollection = db.collection("meals");
     const reviewCollection = db.collection("reviews");
-    const favoriteCollection = db.collection("favorites")
+    const favoriteCollection = db.collection("favorites");
+    const orderCollection = db.collection("orders")
     //    upload user in db
     app.post("/users", async (req, res) => {
       const users = req.body;
@@ -87,6 +89,44 @@ app.post("/favorites", async (req, res) => {
     return res.status(500).json({ error: "Internal server error" });
   }
 });
+
+  /***********************Orders Database************************/  
+  // Post / orders
+  app.post("/orders", async(req,res) => {
+      try{
+          const {  foodId,price,quantity,paymentStatus= 'Pending',userAddress,orderStatus = 'pending', mealName,userEmail, chefId,  } = req.body;
+           if (!userEmail || !foodId ||!userAddress||!paymentStatus ||!orderStatus || !chefId) {
+              return res.status(400).json({
+              error: "userEmail, foodId,userAddress,paymentStatus,orderStatus and chefId are required.",
+      });
+    }  
+
+       const doc = {
+          foodId: String(foodId),
+          mealName: String(mealName),
+          price: Number(price),
+          quantity: Number(quantity),
+          chefId: String(chefId),
+          paymentStatus: String(paymentStatus),
+          userEmail: String(userEmail),
+          userAddress: String(userAddress),
+          orderStatus: String(orderStatus),
+          orderTime: new Date().toISOString(),
+       }
+
+       const order =await orderCollection.insertOne(doc);
+       return res.status(201).json({
+      insertedId: order.insertedId,
+      order: doc,
+      });
+
+
+      }
+      catch(err){
+             console.error("POST /orders error:", err);
+            return res.status(500).json({ error: "Internal server error" });
+      }
+  })
 
     /****************reviews database*************************/ 
 
