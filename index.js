@@ -30,8 +30,19 @@ async function run() {
     const mealsCollection = db.collection("meals");
     const reviewCollection = db.collection("reviews");
     const favoriteCollection = db.collection("favorites");
-    const orderCollection = db.collection("orders")
-    //    upload user in db
+    const orderCollection = db.collection("orders");
+    
+    /***********User Database***************/
+    // Get/ user/role
+    app.get("/users/:email/role",async(req,res) => {
+       const {email} = req.params;
+       const query = {email};
+       const user = await userCollection.findOne(query);
+
+       res.send({role : user?.role || 'user'})
+    })
+
+    //    Post/ user 
     app.post("/users", async (req, res) => {
       const users = req.body;
       const result = await userCollection.insertOne(users);
