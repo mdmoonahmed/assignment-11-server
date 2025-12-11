@@ -37,6 +37,127 @@ async function run() {
 
 
     /************Request For Admin or Chef*****************/ 
+
+    //  PATCH /requests/:id?action=approve OR action=reject
+
+app.patch("/requests/:id", async (req, res) => {
+  try {
+    const id = req.params.id;
+    const { action } = req.body; 
+    if (!id) return res.status(400).json({ error: "request id required" });
+    if (!["approve", "reject"].includes(action)) {
+      return res.status(400).json({ error: "action must be 'approve' or 'reject'" });
+    }
+    if (!requestCollection || !userCollection) {
+      return res.status(500).json({ error: "Server collection not initialized" });
+    }
+
+    const reqObjectId = new ObjectId(id);
+    const requestDoc = await requestCollection.findOne({ _id: reqObjectId });
+    if (!requestDoc) return res.status(404).json({ error: "Request not found" });
+
+    if (requestDoc.requestStatus !== "pending") {
+      return res.status(400).json({ error: `Request already ${requestDoc.requestStatus}` });
+    }
+
+    const updates = {
+      requestStatus: action === "approve" ? "approved" : "rejected",
+      reviewedAt: new Date().toISOString(),
+      
+    };
+
+    // Approve flow: update user role when approving
+    let updatedUser = null;
+    if (action === "approve") {
+      const { userEmail, requestType } = requestDoc;
+      const userQuery = { email: String(userEmail) };
+      const userDoc = await userCollection.findOne(userQuery);
+      if (!userDoc) {
+        
+        return res.status(404).json({ error: "User document not found for this request" });
+      }
+
+      if (requestType === "chef") {
+        // generate unique chefId chef-XXXX
+        let chefId;
+        let tries = 0;
+        do {
+          const num = Math.floor(1000 + Math.random() * 9000); // 4-digit
+          chefId = `chef-${num}`;
+          const exists = await userCollection.findOne({ chefId });
+          if (!exists) break;
+          tries += 1;
+        } while (tries < 5);
+
+        const userUpdate = {
+          $set: { role: "chef", chefId },
+        };
+        await userCollection.updateOne(userQuery, userUpdate);
+        updatedUser = await userCollection.findOne(userQuery);
+
+      } else if (requestType === "admin") {
+        await userCollection.updateOne(userQuery, { $set: { role: "admin" } });
+        updatedUser = await userCollection.findOne(userQuery);
+      } else {
+      }
+    }
+
+    // Save request update
+    await requestCollection.updateOne(
+      { _id: reqObjectId },
+      { $set: updates }
+    );
+
+    const updatedRequest = await requestCollection.findOne({ _id: reqObjectId });
+
+    return res.json({
+      request: updatedRequest,
+      updatedUser,
+    });
+  } catch (err) {
+    console.error("PATCH /requests/:id error:", err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+
+   // GET /requests
+app.get("/requests", async (req, res) => {
+  try {
+    if (!requestCollection) {
+      return res.status(500).json({ error: "Server error: requestCollection not initialized." });
+    }
+
+    const { userEmail, status, limit = 20, page = 1 } = req.query;
+
+    const q = {};
+    if (userEmail) q.userEmail = String(userEmail);
+    if (status) q.requestStatus = String(status);
+
+    const parsedLimit = Math.min(100, Math.max(1, parseInt(limit, 10) || 20));
+    const parsedPage = Math.max(1, parseInt(page, 10) || 1);
+    const skip = (parsedPage - 1) * parsedLimit;
+
+    const cursor = requestCollection
+      .find(q)
+      .project({ /* return all fields; change if you want to limit */ })
+      .sort({ requestTime: -1 })
+      .skip(skip)
+      .limit(parsedLimit);
+
+    const requests = await cursor.toArray();
+    const total = await requestCollection.countDocuments(q);
+
+    // Return a normalized shape the frontend expects
+    return res.json({ requests, total, page: parsedPage, limit: parsedLimit });
+  } catch (err) {
+    console.error("GET /requests error:", err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+
+
     // Post / requests
 app.post("/requests", async (req, res) => {
   try {
