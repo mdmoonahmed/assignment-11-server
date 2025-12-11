@@ -31,6 +31,52 @@ async function run() {
     const reviewCollection = db.collection("reviews");
     const favoriteCollection = db.collection("favorites");
     const orderCollection = db.collection("orders");
+    const requestCollection = db.collection("requests")
+
+
+
+
+    /************Request For Admin or Chef*****************/ 
+    // Post / requests
+app.post("/requests", async (req, res) => {
+  try {
+    const { userId, userName, userEmail, requestType } = req.body;
+
+    // Basic validation
+    if (!userEmail || !requestType || !userName) {
+      return res.status(400).json({ error: "userName, userEmail and requestType are required." });
+    }
+    if (!["chef", "admin"].includes(requestType)) {
+      return res.status(400).json({ error: "requestType must be 'chef' or 'admin'." });
+    }
+
+    // prevent duplicate pending request of same type
+    const existing = await requestCollection.findOne({
+      userEmail: String(userEmail),
+      requestType,
+      requestStatus: "pending"
+    });
+    if (existing) {
+      return res.status(409).json({ error: "You already have a pending request of this type." });
+    }
+
+    const doc = {
+      userId: userId ? String(userId) : null,
+      userName: String(userName),
+      userEmail: String(userEmail),
+      requestType,
+      requestStatus: "pending",
+      requestTime: new Date().toISOString(),
+    };
+
+    const result = await requestCollection.insertOne(doc);
+    return res.status(201).json({ insertedId: result.insertedId, request: doc });
+  } catch (err) {
+    console.error("POST /requests error:", err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 
     /***********User Database***************/
         // GET /users/:email/role
