@@ -79,6 +79,33 @@ app.post("/requests", async (req, res) => {
 
 
     /***********User Database***************/
+
+    // GET /users/:email
+app.get("/users/:email", async (req, res) => {
+  try {
+    const email = req.params.email;
+    if (!email) {
+      return res.status(400).json({ error: "Email parameter is required." });
+    }
+
+    if (!userCollection) {
+      return res.status(500).json({ error: "Server error: userCollection not initialized." });
+    }
+
+    const user = await userCollection.findOne({ email: String(email) });
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found." });
+    }
+    return res.json(user);
+  } catch (err) {
+    console.error("GET /users/:email error:", err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+
+
         // GET /users/:email/role
     app.get("/users/:email/role", async (req, res) => {
       try {
