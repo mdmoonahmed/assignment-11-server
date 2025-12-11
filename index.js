@@ -201,6 +201,74 @@ app.post("/requests", async (req, res) => {
 
     /***********User Database***************/
 
+    // GET /users?limit=100
+app.get("/users", async (req, res) => {
+  try {
+    let { limit = 100 } = req.query;
+    limit = parseInt(limit);
+
+    const users = await userCollection
+      .find() 
+      .limit(limit)
+      .toArray();
+
+    res.send({ users });
+  } catch (err) {
+    console.error("GET /users error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+
+    // server snippet: PATCH /users/:id/status
+
+app.patch("/users/:id/status", async (req, res) => {
+  try {
+    const id = req.params.id;
+    const { status } = req.body; // expected: "fraud" or "active" or other allowed statuses
+
+    if (!id) return res.status(400).json({ error: "User id is required." });
+    if (!status) return res.status(400).json({ error: "Status is required." });
+
+    // optional: validate allowed statuses
+    const allowed = ["active", "fraud"];
+    if (!allowed.includes(status)) {
+      return res.status(400).json({ error: `Status must be one of: ${allowed.join(", ")}` });
+    }
+
+    if (!userCollection) {
+      return res.status(500).json({ error: "Server configuration error: userCollection not initialized." });
+    }
+
+    const userObjectId = new ObjectId(id);
+
+    // find user first
+    const existing = await userCollection.findOne({ _id: userObjectId });
+    if (!existing) return res.status(404).json({ error: "User not found." });
+
+    // don't allow changing admin status to fraud via this endpoint (safety)
+    if (existing.role === "admin" && status === "fraud") {
+      return res.status(403).json({ error: "Cannot mark admin as fraud." });
+    }
+
+    const result = await userCollection.updateOne(
+      { _id: userObjectId },
+      { $set: { status: status } }
+    );
+
+    if (result.modifiedCount === 0) {
+      return res.status(200).json({ message: "No change (status may already be set)." });
+    }
+
+    const updated = await userCollection.findOne({ _id: userObjectId });
+    return res.json({ message: "User status updated.", user: updated });
+  } catch (err) {
+    console.error("PATCH /users/:id/status error:", err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+
     // GET /users/:email
 app.get("/users/:email", async (req, res) => {
   try {
