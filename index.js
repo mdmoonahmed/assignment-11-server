@@ -33,7 +33,26 @@ async function run() {
     const orderCollection = db.collection("orders");
     const requestCollection = db.collection("requests")
 
+    /*****************Order Database***************************/ 
+    // Get / orders?email=
+    app.get("/orders", async(req,res) => {
+      try {
+         const {email} = req.query;
+         const query = {} ;
+         if(email) query.userEmail = String(email);
+        //  if(!email){
+        //   return res.status(400).json({ error: "email is required"});
+        //  }
 
+         const cursor = orderCollection.find(query);
+         const orders =await cursor.toArray();
+         return res.json(orders)
+      }
+      catch(err){
+          console.error("Get / orders error",err);
+          return res.status(500).json({ error: "Internal server error"});
+      }
+    })
 
 
     /************Request For Admin or Chef*****************/ 
@@ -210,6 +229,7 @@ app.get("/users", async (req, res) => {
     const users = await userCollection
       .find() 
       .limit(limit)
+      .sort({_id : -1})
       .toArray();
 
     res.send({ users });
@@ -319,8 +339,48 @@ app.get("/users/:email", async (req, res) => {
       res.send(result);
     });
 
-  /******************Favorites Database**********************/  
-  //  Post / favorites
+  /******************Favorites Database**********************/    
+  // DELETE /favorites/:id
+ app.delete("/favorites/:id", async (req, res) => {
+  try {
+    const id = req.params.id;
+    if (!id) return res.status(400).json({ error: "id required" });
+
+    const result = await favoriteCollection.deleteOne({ _id: new ObjectId(id) });
+    if (result.deletedCount === 0) {
+      return res.status(404).json({ error: "Favorite not found" });
+    }
+    return res.json({ message: "Favorite removed successfully", deletedId: id });
+  } catch (err) {
+    console.error("DELETE /favorites/:id error:", err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+
+
+  // GET /favorites?email=
+app.get("/favorites", async (req, res) => {
+  try {
+    const { email } = req.query;
+    
+    if (!email) {
+      return res.status(400).json({ error: "email is required" });
+    }
+
+    const favorites = await favoriteCollection
+      .find({ userEmail : String(email) })
+      .toArray();
+
+    return res.json(favorites);
+  } catch (err) {
+    console.error("GET /favorites?email error:", err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+
+
  // POST /favorites
 app.post("/favorites", async (req, res) => {
   try {
@@ -375,7 +435,7 @@ app.post("/favorites", async (req, res) => {
   // Post / orders
   app.post("/orders", async(req,res) => {
       try{
-          const {  foodId,price,quantity,paymentStatus= 'Pending',userAddress,orderStatus = 'pending', mealName,userEmail, chefId,  } = req.body;
+          const {  foodId,price,quantity,paymentStatus= 'Pending',userAddress,orderStatus = 'pending', mealName,userEmail, chefId,chefName,estimatedDeliveryTime  } = req.body;
            if (!userEmail || !foodId ||!userAddress||!paymentStatus ||!orderStatus || !chefId) {
               return res.status(400).json({
               error: "userEmail, foodId,userAddress,paymentStatus,orderStatus and chefId are required.",
@@ -388,10 +448,12 @@ app.post("/favorites", async (req, res) => {
           price: Number(price),
           quantity: Number(quantity),
           chefId: String(chefId),
+          chefName: String(chefName),
           paymentStatus: String(paymentStatus),
           userEmail: String(userEmail),
           userAddress: String(userAddress),
           orderStatus: String(orderStatus),
+          estimatedDeliveryTime:String(estimatedDeliveryTime),
           orderTime: new Date().toISOString(),
        }
 
