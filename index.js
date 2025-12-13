@@ -472,6 +472,44 @@ app.post("/favorites", async (req, res) => {
   })
 
     /****************Reviews database*************************/ 
+// PATCH /reviews/:id
+app.patch("/reviews/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { rating, comment } = req.body;
+
+    if (!rating && !comment) {
+      return res.status(400).json({
+        error: "rating or comment required",
+      });
+    }
+
+    const updateDoc = {
+      $set: {
+        ...(rating && { rating: Number(rating) }),
+        ...(comment && { comment }),
+        updatedAt: new Date().toISOString(),
+      },
+    };
+
+    const result = await reviewCollection.updateOne(
+      { _id: new ObjectId(id) },
+      updateDoc
+    );
+
+    if (result.matchedCount === 0) {
+      return res.status(404).json({ error: "Review not found" });
+    }
+
+    res.json({ message: "Review updated successfully" });
+  } catch (err) {
+    console.error("PATCH /reviews/:id error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+
+
 // DELETE /reviews/:id
 app.delete("/reviews/:id", async (req, res) => {
   try {
