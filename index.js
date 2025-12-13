@@ -471,12 +471,64 @@ app.post("/favorites", async (req, res) => {
       }
   })
 
-    /****************reviews database*************************/ 
+    /****************Reviews database*************************/ 
+    // GET /reviews/user?email=
+app.get("/reviews/user", async (req, res) => {
+  try {
+    const email = req.query.email;
+    if (!email) {
+      return res.status(400).json({ error: "email is required" });
+    }
+
+    const reviews = await reviewCollection.aggregate([
+      {
+        $match: { reviewerEmail: email }
+      },
+      {
+        $addFields: {
+          foodObjectId: { $toObjectId: "$foodId" }
+        }
+      },
+      {
+        $lookup: {
+          from: "meals",
+          localField: "foodObjectId",
+          foreignField: "_id",
+          as: "meal"
+        }
+      },
+      {
+        $unwind: {
+          path: "$meal",
+          preserveNullAndEmptyArrays: true
+        }
+      },
+      {
+        $project: {
+          reviewerName: 1,
+          rating: 1,
+          comment: 1,
+          date: 1,
+          foodId: 1,
+          mealName: "$meal.foodName"
+        }
+      }
+    ]).toArray();
+
+    res.send(reviews);
+  } catch (err) {
+    console.error("GET /reviews/user error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+
+
 
     // POST /reviews
 app.post("/reviews", async (req, res) => {
   try {
-    const { foodId, reviewerName, reviewerImage, rating, comment } = req.body;
+    const { foodId,reviewerEmail, reviewerName, reviewerImage, rating, comment } = req.body;
 
     // basic validation
     if (!foodId || !reviewerName || typeof rating === "undefined" || !comment) {
@@ -490,6 +542,7 @@ app.post("/reviews", async (req, res) => {
 
     const doc = {
       foodId: String(foodId),
+      reviewerEmail: String(reviewerEmail),
       reviewerName: String(reviewerName),
       reviewerImage: reviewerImage ? String(reviewerImage) : "",
       rating: parsedRating,
