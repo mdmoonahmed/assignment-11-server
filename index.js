@@ -684,6 +684,69 @@ app.get("/reviews", async (req, res) => {
 
 
     /****************meals database*************************/ 
+    // POST /meals
+app.post("/meals", async (req, res) => {
+  try {
+    const {
+      foodName,
+      chefName,
+      foodImage,
+      price,
+      rating = 0,
+      ingredients,
+      estimatedDeliveryTime,
+      deliveryArea,
+      chefExperience,
+      chefId,
+      userEmail,
+    } = req.body;
+
+    // Basic validation
+    if (
+      !foodName ||
+      !chefName ||
+      !foodImage ||
+      !price ||
+      !ingredients ||
+      !estimatedDeliveryTime ||
+      !deliveryArea ||
+      !chefExperience ||
+      !chefId ||
+      !userEmail
+    ) {
+      return res.status(400).json({
+        error: "All required fields must be provided.",
+      });
+    }
+
+    const mealDoc = {
+      foodName,
+      chefName,
+      foodImage,
+      price: Number(price),
+      rating: Number(rating),
+      ingredients: Array.isArray(ingredients) ? ingredients : ingredients.split(","),
+      estimatedDeliveryTime,
+      deliveryArea,
+      chefExperience,
+      chefId,
+      userEmail,
+      createdAt: new Date().toISOString(),
+    };
+
+    const result = await mealsCollection.insertOne(mealDoc);
+
+    res.status(201).json({
+      message: "Meal created successfully",
+      insertedId: result.insertedId,
+      meal: mealDoc,
+    });
+  } catch (err) {
+    console.error("POST /meals error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 
     // get featured meals from db
     app.get("/featured-meals", async (req, res) => {
