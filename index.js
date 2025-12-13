@@ -472,6 +472,28 @@ app.post("/favorites", async (req, res) => {
   })
 
     /****************Reviews database*************************/ 
+// DELETE /reviews/:id
+app.delete("/reviews/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const result = await reviewCollection.deleteOne({
+      _id: new ObjectId(id),
+    });
+
+    if (result.deletedCount === 0) {
+      return res.status(404).json({ error: "Review not found" });
+    }
+
+    res.json({ message: "Review deleted successfully" });
+  } catch (err) {
+    console.error("DELETE /reviews/:id error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+  
+
     // GET /reviews/user?email=
 app.get("/reviews/user", async (req, res) => {
   try {
