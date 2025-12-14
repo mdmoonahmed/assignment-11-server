@@ -684,6 +684,37 @@ app.get("/reviews", async (req, res) => {
 
 
     /****************meals database*************************/ 
+    //  Delete / meals
+    app.delete("/meals/:id",async(req,res) => {
+       const { id } = req.params;
+       const query = { _id: new ObjectId(id)};
+       const result = await mealsCollection.deleteOne(query);
+       if(result.deletedId === 0){
+        return res.status(404).json("Meal not found")
+       }
+       if(result.deletedCount === 1){
+        return res.json("Meal deleted successfully")
+       }
+    })
+
+
+    //  Get / meals/chef?email=
+    app.get('/meals/chef',async(req,res) => {
+      try{
+         const email = req.query.email;
+         if(!email){
+          return res.status(400).json({ error: "Email is required"})
+         }
+         const query = {userEmail : String(email)};
+         const meals = await mealsCollection.find(query).toArray();
+         return res.json(meals);
+      }
+      catch(err){
+         return res.status(500).json({ error: "Internal server error"});
+      }
+    });
+
+
     // POST /meals
 app.post("/meals", async (req, res) => {
   try {
