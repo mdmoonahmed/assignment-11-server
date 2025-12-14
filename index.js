@@ -34,6 +34,24 @@ async function run() {
     const requestCollection = db.collection("requests")
 
     /*****************Order Database***************************/ 
+    // Get / orders/chef?chefId=
+    app.get("/orders/chef",async(req,res) => {
+      try{
+         const {chefId } = req.query;
+         if(!chefId){
+          return res.status(400).json("chefId required");
+         }
+         const query = { chefId : String(chefId) }
+         const orders = await orderCollection.find(query).toArray();
+         return res.json(orders)
+      }
+      catch(err){
+         console.error('Get/orders/chef error:',err);
+         return res.status(500).json({error:"Internal server error"})
+      }
+    })
+
+
     // Get / orders?email=
     app.get("/orders", async(req,res) => {
       try {
@@ -683,7 +701,38 @@ app.get("/reviews", async (req, res) => {
 
 
 
-    /****************meals database*************************/ 
+    /****************meals database*************************/
+    // Patch / meals/:id
+    app.patch("/meals/:id",async(req,res)=>{
+        try{
+           const {id} = req.params;
+           const {foodName,price,ingredients,estimatedDeliveryTime } = req.body;
+           if(!foodName && !price && !ingredients && !estimatedDeliveryTime){
+            return  res.status(400).json("Nothing to change");
+           }
+           const query = {_id : new ObjectId(id)};
+           const doc = {
+              $set:{
+                foodName,
+                price:Number(price),
+                ingredients,
+                estimatedDeliveryTime
+              }
+           }
+           const result = await mealsCollection.updateOne(query,doc);
+           if(result.matchedCount === 0){
+            return res.status(404).json("Meal not found")
+           }
+           return res.json('Meal updated successfully');
+        }
+        catch(err){
+            console.error("Patch / meals/:id error:",err);
+            res.status(500).json("Internal server error")
+        }
+
+    })
+    
+
     //  Delete / meals
     app.delete("/meals/:id",async(req,res) => {
        const { id } = req.params;
