@@ -2,6 +2,7 @@ const express = require("express");
 const cors = require("cors");
 require("dotenv").config();
 const { MongoClient, ServerApiVersion, ObjectId, ChangeStream } = require("mongodb");
+const stripe = require('stripe')(process.env.STRIPE_SECURE);
 
 const app = express();
 const port = 3000;
@@ -33,7 +34,94 @@ async function run() {
     const orderCollection = db.collection("orders");
     const requestCollection = db.collection("requests")
 
+
+    /*****************Payment**********************/ 
+app.post("/create-checkout-session", async (req, res) => {
+  try {
+    const { mealName, foodId, email, price } = req.body;
+
+    if (!mealName || !foodId || !email || !price) {
+      return res.status(400).json({ error: "Missing required fields" });
+    }
+
+    const amount = Math.round(Number(price) * 100);
+
+    if (!amount || amount <= 0) {
+      return res.status(400).json({ error: "Invalid price" });
+    }
+
+    const session = await stripe.checkout.sessions.create({
+      line_items: [
+        {
+          price_data: {
+            currency: "usd", // ✅ FIXED
+            product_data: {
+              name: mealName,
+            },
+            unit_amount: amount,
+          },
+          quantity: 1,
+        },
+      ],
+      metadata: {               // ✅ FIXED
+        foodId,
+      },
+      customer_email: email,
+      mode: "payment",
+      success_url: `${process.env.SITE_DOMAIN}/dashboard/payment-success`,
+      cancel_url: `${process.env.SITE_DOMAIN}/dashboard/payment-cancel`,
+    });
+
+    res.send({ url: session.url });
+  } catch (error) {
+    console.error("Stripe Error:", error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+
     /*****************Order Database***************************/ 
+// PATCH /orders/:id
+app.patch("/orders/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { orderStatus } = req.body;
+
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).json({ error: "Invalid order ID" });
+    }
+
+    const allowedStatus = ["pending", "accepted", "delivered", "cancelled"];
+    if (!allowedStatus.includes(orderStatus)) {
+      return res.status(400).json({ error: "Invalid order status" });
+    }
+
+    const query = { _id: new ObjectId(id) };
+
+    const updateDoc = {
+      $set: {
+        orderStatus: String(orderStatus),
+      },
+    };
+
+    const result = await orderCollection.updateOne(query, updateDoc);
+
+    if (result.matchedCount === 0) {
+      return res.status(404).json({ error: "Order not found" });
+    }
+
+    return res.json({
+      success: true,
+      message: "Order status updated successfully",
+    });
+  } catch (err) {
+    console.error("PATCH /orders/:id error:", err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+
+
     // Get / orders/chef?chefId=
     app.get("/orders/chef",async(req,res) => {
       try{
