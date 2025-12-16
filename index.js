@@ -36,6 +36,31 @@ async function run() {
 
 
     /*****************Payment**********************/ 
+    //  Patch / payment-succes?session_id=
+    app.patch("/payment-success", async(req,res) => {
+       const {session_id} = req.query;
+       if(!session_id){
+        return res.status(400).json("session_id required")
+       }
+       const session = await  stripe.checkout.sessions.retrieve(req.query.session_id);
+       console.log("session retrieve",session);
+       if(session.payment_status === 'paid'){
+          const id = session.metadata.foodId;
+          const query = {_id : new ObjectId(id)};
+          const update = {
+            $set: {
+               paymentStatus: "Paid",
+            }
+          }
+          const result = await orderCollection.updateOne(query,update);
+          res.send({ success : true})
+       }
+       res.send({ success : false})
+       
+    })
+
+
+    // Create checkout-session 
 app.post("/create-checkout-session", async (req, res) => {
   try {
     const { mealName, foodId, email, price } = req.body;
@@ -43,8 +68,8 @@ app.post("/create-checkout-session", async (req, res) => {
     if (!mealName || !foodId || !email || !price) {
       return res.status(400).json({ error: "Missing required fields" });
     }
-
-    const amount = Math.round(Number(price) * 100);
+    const usdRate = 127.0827;
+    const amount = Math.round(Number(price / usdRate) * 100);
 
     if (!amount || amount <= 0) {
       return res.status(400).json({ error: "Invalid price" });
@@ -54,21 +79,21 @@ app.post("/create-checkout-session", async (req, res) => {
       line_items: [
         {
           price_data: {
-            currency: "usd", // ✅ FIXED
+            currency: "usd",  
             product_data: {
-              name: mealName,
+              name: `Please pay for ${mealName}`,
             },
             unit_amount: amount,
           },
           quantity: 1,
         },
       ],
-      metadata: {               // ✅ FIXED
+      metadata: {              
         foodId,
       },
       customer_email: email,
       mode: "payment",
-      success_url: `${process.env.SITE_DOMAIN}/dashboard/payment-success`,
+      success_url: `${process.env.SITE_DOMAIN}/dashboard/payment-success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${process.env.SITE_DOMAIN}/dashboard/payment-cancel`,
     });
 
